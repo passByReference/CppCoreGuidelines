@@ -23,6 +23,8 @@ ABA
 abi
 ABI
 ABIs
+Abrahams
+Abrahams01
 abstr
 accessor
 ack
@@ -230,13 +232,13 @@ impactful
 impl
 Impl
 implicitpointercast
-incompleat
+incomplet
+incorrekt
 increment1
 Incrementable
 indices
 ing
 init
-inkorrekt
 inline
 inlined
 inlining
@@ -335,6 +337,7 @@ ness
 newdelete
 nh
 NL
+nodiscard
 noexcept
 noname
 nondependent

@@ -1,6 +1,6 @@
 # <a name="main"></a>C++ Core Guidelines
 
-July 3, 2017
+October 23, 2017
 
 
 Editors:
@@ -8,8 +8,8 @@ Editors:
 * [Bjarne Stroustrup](http://www.stroustrup.com)
 * [Herb Sutter](http://herbsutter.com/)
 
-This document is a very early draft. It is inkorrekt, incompleat, and pÂµÃoorly formatted.
-Had it been an open-source (code) project, this would have been release 0.7.
+This document is an early draft. It's known to be incomplet, incorrekt, and has lots of b**a**d **for**~mat~ting.
+Had it been an open-source (code) project, this would have been release 0.8.
 Copying, use, modification, and creation of derivative works from this project is licensed under an MIT-style license.
 Contributing to this project requires agreeing to a Contributor License. See the accompanying [LICENSE](LICENSE) file for details.
 We make this project available to "friendly users" to use, copy, modify, and derive from, hoping for constructive input.
@@ -594,6 +594,7 @@ Now, there is no explicit mention of the iteration mechanism, and the loop opera
 
     for (auto& x : v) { /* modify x */ }
 
+For more details about for-statements, see [ES.71](#Res-for-range).
 Sometimes better still, use a named algorithm:
 
     for_each(v, [](int x) { /* do something with the value of x */ });
@@ -680,10 +681,12 @@ You don't need to write error handlers for errors caught at compile time.
     if (bits < 32)
         cerr << "Int too small\n"
 
-This example is easily simplified
+This example fails to achieve what it is trying to achieve (because overflow is undefined) and should be replaced with a simple `static_assert`:
 
     // Int is an alias used for integers
     static_assert(sizeof(Int) >= 4);    // do: compile-time check
+
+Or better still just use the type system and replace `Int` with `int32_t`.
 
 ##### Example
 
@@ -1018,7 +1021,7 @@ Time and space that you spend well to achieve a goal (e.g., speed of development
         x.ch = 'a';
         x.s = string(n);    // give x.s space for *p
         for (int i = 0; i < x.s.size(); ++i) x.s[i] = buf[i];  // copy buf into x.s
-        delete buf;
+        delete[] buf;
         return x;
     }
 
@@ -1196,7 +1199,7 @@ Interface rule summary:
 * [I.8: Prefer `Ensures()` for expressing postconditions](#Ri-ensures)
 * [I.9: If an interface is a template, document its parameters using concepts](#Ri-concepts)
 * [I.10: Use exceptions to signal a failure to perform a required task](#Ri-except)
-* [I.11: Never transfer ownership by a raw pointer (`T*`)](#Ri-raw)
+* [I.11: Never transfer ownership by a raw pointer (`T*`) or reference (`T&`)](#Ri-raw)
 * [I.12: Declare a pointer that must not be null as `not_null`](#Ri-nullptr)
 * [I.13: Do not pass an array as a single pointer](#Ri-array)
 * [I.22: Avoid complex initialization of global objects](#Ri-global-init)
@@ -1693,8 +1696,8 @@ Use the ISO Concepts TS style of requirements specification. For example:
 
 ##### Note
 
-Soon (maybe in 2017), most compilers will be able to check `requires` clauses once the `//` is removed.
-For now, the concept TS is supported only in GCC 6.1.
+Soon (maybe in 2018), most compilers will be able to check `requires` clauses once the `//` is removed.
+For now, the concept TS is supported only in GCC 6.1 and later.
 
 **See also**: [Generic programming](#SS-GP) and [concepts](#SS-t-concepts).
 
@@ -1738,7 +1741,7 @@ If you can't use exceptions (e.g. because your code is full of old-style raw-poi
     int val;
     int error_code;
     tie(val, error_code) = do_something();
-    if (error_code == 0) {
+    if (error_code) {
         // ... handle the error or exit ...
     }
     // ... use val ...
@@ -1747,7 +1750,7 @@ This style unfortunately leads to uninitialized variables.
 A facility [structured bindings](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0144r1.pdf) to deal with that will become available in C++17.
 
     auto [val, error_code] = do_something();
-    if (error_code == 0) {
+    if (error_code) {
         // ... handle the error or exit ...
     }
     // ... use val ...
@@ -1769,7 +1772,7 @@ We don't consider "performance" a valid reason not to use exceptions.
 * (Not enforceable) This is a philosophical guideline that is infeasible to check directly.
 * Look for `errno`.
 
-### <a name="Ri-raw"></a>I.11: Never transfer ownership by a raw pointer (`T*`)
+### <a name="Ri-raw"></a>I.11: Never transfer ownership by a raw pointer (`T*`) or reference (`T&`)
 
 ##### Reason
 
@@ -2237,7 +2240,7 @@ So, we write a class
         Istream() { }
         Istream(zstring p) :owned{true}, inp{new ifstream{p}} {}            // read from file
         Istream(zstring p, Opt) :owned{true}, inp{new istringstream{p}} {}  // read from command line
-        ~Itream() { if (owned) delete inp; }
+        ~Istream() { if (owned) delete inp; }
         operator istream& () { return *inp; }
     private:
         bool owned = false;
@@ -2461,10 +2464,10 @@ Consider:
             intermediate = func2(intermediate);
         }
         switch (flag2 / 10) {
-            case 1: if (flag1 == -1) return finalize(intermediate, 1.171);
-                    break;
-            case 2: return finalize(intermediate, 13.1);
-            default: break;
+        case 1: if (flag1 == -1) return finalize(intermediate, 1.171);
+                break;
+        case 2: return finalize(intermediate, 13.1);
+        default: break;
         }
         return finalize(intermediate, 0.);
     }
@@ -2840,7 +2843,7 @@ For advanced uses (only), where you really need to optimize for rvalues passed t
 Avoid "esoteric techniques" such as:
 
 * Passing arguments as `T&&` "for efficiency".
-  Most rumors about performance advantages from passing by `&&` are false or brittle (but see [F.25](#Rf-pass-ref-move).)
+  Most rumors about performance advantages from passing by `&&` are false or brittle (but see [F.18](#Rf-consume) and [F.19](#Rf-forward)).
 * Returning `const T&` from assignments and similar operations (see [F.47](#Rf-assignment-op).)
 
 ##### Example
@@ -2885,7 +2888,7 @@ This makes it clear to callers that the object is assumed to be modified.
 
 ##### Note
 
-A `T&` argument can pass information into a function as well as well as out of it.
+A `T&` argument can pass information into a function as well as out of it.
 Thus `T&` could be an in-out-parameter. That can in itself be a problem and a source of errors:
 
     void f(string& s)
@@ -3580,7 +3583,7 @@ Flag functions where no `return` expression could yield `nullptr`
 
 ##### Reason
 
-It's asking to return a reference to a destroyed temporary object. A `&&` is a magnet for temporary objects. This is fine when the reference to the temporary is being passed "downward" to a callee, because the temporary is guaranteed to outlive the function call. (See [F.24](#Rf-pass-ref-ref) and [F.25](#Rf-pass-ref-move).) However, it's not fine when passing such a reference "upward" to a larger caller scope. See also ???.
+It's asking to return a reference to a destroyed temporary object. A `&&` is a magnet for temporary objects. This is fine when the reference to the temporary is being passed "downward" to a callee, because the temporary is guaranteed to outlive the function call (see [F.18](#Rf-consume) and [F.19](#Rf-forward)). However, it's not fine when passing such a reference "upward" to a larger caller scope. See also ???.
 
 For passthrough functions that pass in parameters (by ordinary reference or by perfect forwarding) and want to return values, use simple `auto` return type deduction (not `auto&&`).
 
@@ -3710,7 +3713,7 @@ Generic lambdas offer a concise way to write function templates and so can be us
 
 ##### Reason
 
-Default arguments simply provides alternative interfaces to a single implementation.
+Default arguments simply provide alternative interfaces to a single implementation.
 There is no guarantee that a set of overloaded functions all implement the same semantics.
 The use of default arguments can avoid code replication.
 
@@ -4165,11 +4168,11 @@ All of this decreases readability and complicates maintenance.
 
 ##### Note
 
-Prefer to place the interface first in a class [see](#Rl-order).
+Prefer to place the interface first in a class, [see NL.16](#Rl-order).
 
 ##### Enforcement
 
-Flag classes declared with `struct` if there is a `private` or `public` member.
+Flag classes declared with `struct` if there is a `private` or `protected` member.
 
 ### <a name="Rc-private"></a>C.9: Minimize exposure of members
 
@@ -4195,7 +4198,7 @@ This may be exactly what we want, but if we want to enforce a relation among mem
 and enforce that relation (invariant) through constructors and member functions.
 For example:
 
-    struct Distance {
+    class Distance {
     public:
         // ...
         double meters() const { return magnitude*unit; }
@@ -4388,7 +4391,6 @@ Destructor rules:
 * [C.31: All resources acquired by a class must be released by the class's destructor](#Rc-dtor-release)
 * [C.32: If a class has a raw pointer (`T*`) or reference (`T&`), consider whether it might be owning](#Rc-dtor-ptr)
 * [C.33: If a class has an owning pointer member, define or `=delete` a destructor](#Rc-dtor-ptr2)
-* [C.34: If a class has an owning reference member, define or `=delete` a destructor](#Rc-dtor-ref)
 * [C.35: A base class with a virtual function needs a virtual destructor](#Rc-dtor-virtual)
 * [C.36: A destructor may not fail](#Rc-dtor-fail)
 * [C.37: Make destructors `noexcept`](#Rc-dtor-noexcept)
@@ -4763,63 +4765,6 @@ That would sometimes require non-trivial code changes and may affect ABIs.
 * A class with a pointer data member is suspect.
 * A class with an `owner<T>` should define its default operations.
 
-### <a name="Rc-dtor-ref"></a>C.34: If a class has an owning reference member, define a destructor
-
-##### Reason
-
-A reference member may represent a resource.
-It should not do so, but in older code, that's common.
-See [pointer members and destructors](#Rc-dtor-ptr).
-Also, copying may lead to slicing.
-
-##### Example, bad
-
-    class Handle {  // Very suspect
-        Shape& s;   // use reference rather than pointer to prevent rebinding
-                    // BAD: vague about ownership of *p
-        // ...
-    public:
-        Handle(Shape& ss) : s{ss} { /* ... */ }
-        // ...
-    };
-
-The problem of whether `Handle` is responsible for the destruction of its `Shape` is the same as for [the pointer case](#Rc-dtor-ptr):
-If the `Handle` owns the object referred to by `s` it must have a destructor.
-
-##### Example
-
-    class Handle {        // OK
-        owner<Shape&> s;  // use reference rather than pointer to prevent rebinding
-        // ...
-    public:
-        Handle(Shape& ss) : s{ss} { /* ... */ }
-        ~Handle() { delete &s; }
-        // ...
-    };
-
-Independently of whether `Handle` owns its `Shape`, we must consider the default copy operations suspect:
-
-    // the Handle had better own the Circle or we have a leak
-    Handle x {*new Circle{p1, 17}};
-
-    Handle y {*new Triangle{p1, p2, p3}};
-    x = y;     // the default assignment will try *x.s = *y.s
-
-That `x = y` is highly suspect.
-Assigning a `Triangle` to a `Circle`?
-Unless `Shape` has its [copy assignment `=deleted`](#Rc-copy-virtual), only the `Shape` part of `Triangle` is copied into the `Circle`.
-
-##### Note
-
-Why not just require all owning references to be replaced by "smart pointers"?
-Changing from references to smart pointers implies code changes.
-We don't (yet) have smart references.
-Also, that may affect ABIs.
-
-##### Enforcement
-
-* A class with a reference data member is suspect.
-* A class with an `owner<T>` reference should define its default operations.
 
 ### <a name="Rc-dtor-virtual"></a>C.35: A base class destructor should be either public and virtual, or protected and nonvirtual
 
@@ -5633,7 +5578,7 @@ Types can be defined to move for logical as well as performance reasons.
 
 ##### Reason
 
-It is simple and efficient. If you want to optimize for rvalues, provide an overload that takes a `&&` (see [F.24](#Rf-pass-ref-ref)).
+It is simple and efficient. If you want to optimize for rvalues, provide an overload that takes a `&&` (see [F.18](#Rf-consume)).
 
 ##### Example
 
@@ -5658,7 +5603,7 @@ It is simple and efficient. If you want to optimize for rvalues, provide an over
 
 ##### Note
 
-The `swap` implementation technique offers the [strong guarantee](???).
+The `swap` implementation technique offers the [strong guarantee](#Abrahams01).
 
 ##### Example
 
@@ -5687,7 +5632,7 @@ But what if you can get significantly better performance by not making a tempora
         return *this;
     }
 
-By writing directly to the target elements, we will get only [the basic guarantee](#???) rather than the strong guarantee offered by the `swap` technique. Beware of [self-assignment](#Rc-copy-self).
+By writing directly to the target elements, we will get only [the basic guarantee](#Abrahams01) rather than the strong guarantee offered by the `swap` technique. Beware of [self-assignment](#Rc-copy-self).
 
 **Alternatives**: If you think you need a `virtual` assignment operator, and understand why that's deeply problematic, don't call it `operator=`. Make it a named function like `virtual void assign(const Foo&)`.
 See [copy constructor vs. `clone()`](#Rc-copy-virtual).
@@ -5728,7 +5673,7 @@ After a copy `x` and `y` can be independent objects (value semantics, the way no
     X::X(const X& a)
         :p{new T[a.sz]}, sz{a.sz}
     {
-        copy(a.p, a.p + sz, a.p);
+        copy(a.p, a.p + sz, p);
     }
 
     X x;
@@ -5865,7 +5810,7 @@ After `y = std::move(x)` the value of `y` should be the value `x` had and `x` sh
     class X {   // OK: value semantics
     public:
         X();
-        X(X&& a);          // move X
+        X(X&& a) noexcept;  // move X
         void modify();     // change the value of X
         // ...
         ~X() { delete[] p; }
@@ -5896,7 +5841,7 @@ Ideally, that moved-from should be the default value of the type.
 Ensure that unless there is an exceptionally good reason not to.
 However, not all types have a default value and for some types establishing the default value can be expensive.
 The standard requires only that the moved-from object can be destroyed.
-Often, we can easily and cheaply do better: The standard library assumes that it it possible to assign to a moved-from object.
+Often, we can easily and cheaply do better: The standard library assumes that it is possible to assign to a moved-from object.
 Always leave the moved-from object in some (necessarily specified) valid state.
 
 ##### Note
@@ -5923,7 +5868,7 @@ If `x = x` changes the value of `x`, people will be surprised and bad errors may
         // ...
     };
 
-    Foo& Foo::operator=(Foo&& a)       // OK, but there is a cost
+    Foo& Foo::operator=(Foo&& a) noexcept  // OK, but there is a cost
     {
         if (this == &a) return *this;  // this line is redundant
         s = std::move(a.s);
@@ -5935,7 +5880,7 @@ The one-in-a-million argument against `if (this == &a) return *this;` tests from
 
 ##### Note
 
-There is no know general way of avoiding a `if (this == &a) return *this;` test for a move assignment and still get a correct answer (i.e., after `x = x` the value of `x` is unchanged).
+There is no known general way of avoiding a `if (this == &a) return *this;` test for a move assignment and still get a correct answer (i.e., after `x = x` the value of `x` is unchanged).
 
 ##### Note
 
@@ -5976,7 +5921,7 @@ A non-throwing move will be used more efficiently by standard-library and langua
         int sz;
     };
 
-These copy operations do not throw.
+These operations do not throw.
 
 ##### Example, bad
 
@@ -6691,6 +6636,8 @@ Use `virtual` only when declaring a new virtual function. Use `override` only wh
         // ...
     };
 
+##### Example, good
+
     struct Better : B {
         void f1(int) override;        // error (caught): D::f1() hides B::f1()
         void f2(int) const override;
@@ -6842,7 +6789,7 @@ First we devise a hierarchy of interface classes:
 
     class Circle : public Shape {   // pure interface
     public:
-        int radius() = 0;
+        virtual int radius() = 0;
         // ...
     };
 
@@ -6852,13 +6799,13 @@ To make this interface useful, we must provide its implementation classes (here,
     public:
         // constructors, destructor
         // ...
-        virtual Point center() const { /* ... */ }
-        virtual Color color() const { /* ... */ }
+        Point center() const override { /* ... */ }
+        Color color() const override { /* ... */ }
 
-        virtual void rotate(int) { /* ... */ }
-        virtual void move(Point p) { /* ... */ }
+        void rotate(int) override { /* ... */ }
+        void move(Point p) override { /* ... */ }
 
-        virtual void redraw() { /* ... */ }
+        void redraw() override { /* ... */ }
 
         // ...
     };
@@ -6870,7 +6817,7 @@ but bear with us because this is just a simple example of a technique aimed at m
     public:
         // constructors, destructor
 
-        int radius() { /* ... */ }
+        int radius() override { /* ... */ }
         // ...
     };
 
@@ -6881,7 +6828,7 @@ And we could extend the hierarchies by adding a Smiley class (:-)):
         // ...
     };
 
-    class Impl::Smiley : Public Smiley, public Impl::Circle {   // implementation
+    class Impl::Smiley : public Smiley, public Impl::Circle {   // implementation
     public:
         // constructors, destructor
         // ...
@@ -7906,6 +7853,45 @@ Note that `std::addressof()` always yields a built-in pointer.
 
 Tricky. Warn if `&` is user-defined without also defining `->` for the result type.
 
+### <a name="Ro-overload"></a>C.167: Use an operator for an operation with its conventional meaning
+
+##### Reason
+
+Readability. Convention. Reusability. Support for generic code
+
+##### Example
+
+    void cout_my_class(const My_class& c) // confusing, not conventional,not generic
+    {
+        std::cout << /* class members here */;
+    }
+
+    std::ostream& operator<<(std::ostream& os, const my_class& c) // OK
+    {
+        return os << /* class members here */;
+    }
+
+By itself, `cout_my_class` would be OK, but it is not usable/composable with code that rely on the `<<` convention for output:
+
+    My_class var { /* ... */ };
+    // ...
+    cout << "var = " << var << '\n';
+
+##### Note
+
+There are strong and vigorous conventions for the meaning most operators, such as
+
+* comparisons (`==`, `!=`, `<`, `<=`, `>`, and `>=`),
+* arithmetic operations (`+`, `-`, `*`, `/`, and `%`)
+* access operations (`.`, `->`, unary `*`, and `[]`)
+* assignment (`=`)
+
+Don't define those unconventionally and don't invent your own names for them.
+
+##### Enforcement
+
+Tricky. Requires semantic insight.
+
 ### <a name="Ro-namespace"></a>C.168: Define overloaded operators in the namespace of their operands
 
 ##### Reason
@@ -7970,45 +7956,6 @@ This is a special case of the rule that [helper functions should be defined in t
 ##### Enforcement
 
 * Flag operator definitions that are not it the namespace of their operands
-
-### <a name="Ro-overload"></a>C.167: Use an operator for an operation with its conventional meaning
-
-##### Reason
-
-Readability. Convention. Reusability. Support for generic code
-
-##### Example
-
-    void cout_my_class(const My_class& c) // confusing, not conventional,not generic
-    {
-        std::cout << /* class members here */;
-    }
-
-    std::ostream& operator<<(std::ostream& os, const my_class& c) // OK
-    {
-        return os << /* class members here */;
-    }
-
-By itself, `cout_my_class` would be OK, but it is not usable/composable with code that rely on the `<<` convention for output:
-
-    My_class var { /* ... */ };
-    // ...
-    cout << "var = " << var << '\n';
-
-##### Note
-
-There are strong and vigorous conventions for the meaning most operators, such as
-
-* comparisons (`==`, `!=`, `<`, `<=`, `>`, and `>=`),
-* arithmetic operations (`+`, `-`, `*`, `/`, and `%`)
-* access operations (`.`, `->`, unary `*`, and `[]`)
-* assignment (`=`)
-
-Don't define those unconventionally and don't invent your own names for them.
-
-##### Enforcement
-
-Tricky. Requires semantic insight.
 
 ### <a name="Ro-lambda"></a>C.170: If you feel like overloading a lambda, use a generic lambda
 
@@ -8677,7 +8624,7 @@ What is `Port`? A handy wrapper that encapsulates the resource:
 
 ##### Note
 
-Where a resource is "ill-behaved" in that it isn't represented as a class with a destructor, wrap it in a class or use [`finally`](#S-gsl)
+Where a resource is "ill-behaved" in that it isn't represented as a class with a destructor, wrap it in a class or use [`finally`](#Re-finally)
 
 **See also**: [RAII](#Rr-raii).
 
@@ -9099,6 +9046,8 @@ Consider:
         X* p1 { new X };              // see also ???
         unique_ptr<T> p2 { new X };   // unique ownership; see also ???
         shared_ptr<T> p3 { new X };   // shared ownership; see also ???
+        auto p4 = make_unique<X>();   // unique_ownership, preferable to the explicit use "new"
+        auto p5 = make_shared<X>();   // shared ownership, preferable to the explicit use "new"
     }
 
 This will leak the object used to initialize `p1` (only).
@@ -9515,6 +9464,7 @@ Statement rules:
 * [ES.84: Don't (try to) declare a local variable with no name](#Res-noname)
 * [ES.85: Make empty statements visible](#Res-empty)
 * [ES.86: Avoid modifying loop control variables inside the body of raw for-loops](#Res-loop-counter)
+* [ES.87: Don't add redundant `==` or `!=` to conditions](#Res-if)
 
 Arithmetic rules:
 
@@ -10158,7 +10108,7 @@ Many such errors are introduced during maintenance years after the initial imple
 
 ##### Exception
 
-It you are declaring an object that is just about to be initialized from input, initializing it would cause a double initialization.
+If you are declaring an object that is just about to be initialized from input, initializing it would cause a double initialization.
 However, beware that this may leave uninitialized data beyond the input -- and that has been a fertile source of errors and security breaches:
 
     constexpr int max = 8 * 1024;
@@ -10352,7 +10302,7 @@ The C++17 rules are somewhat less surprising:
 
 So use `={...}` if you really want an `initializer_list<T>`
 
-    auto fib10 = {0, 1, 2, 3, 5, 8, 13, 21, 34, 55};   // fib10 is a list
+    auto fib10 = {1, 1, 2, 3, 5, 8, 13, 21, 34, 55};   // fib10 is a list
 
 ##### Note
 
@@ -10679,6 +10629,32 @@ Requires messy cast-and-macro-laden code to get working right.
     }
 
 **Alternative**: Overloading. Templates. Variadic templates.
+    #include <iostream>
+
+    void error(int severity)
+    {
+        std::cerr << '\n';
+        std::exit(severity);
+    }
+
+    template <typename T, typename... Ts>
+    constexpr void error(int severity, T head, Ts... tail)
+    {
+        std::cerr << head;
+        error(severity, tail...);
+    }
+
+    void use()
+    {
+        error(7); // No crash!
+        error(5, "this", "is", "not", "an", "error"); // No crash!
+
+        std::string an = "an";
+        error(7, "this", "is", "not", an, "error"); // No crash!
+
+        error(5, "oh", "no", nullptr); // Compile error! No need for nullptr.
+    }
+
 
 ##### Note
 
@@ -10689,497 +10665,6 @@ This is basically the way `printf` is implemented.
 * Flag definitions of C-style variadic functions.
 * Flag `#include <cstdarg>` and `#include <stdarg.h>`
 
-
-## ES.stmt: Statements
-
-Statements control the flow of control (except for function calls and exception throws, which are expressions).
-
-### <a name="Res-switch-if"></a>ES.70: Prefer a `switch`-statement to an `if`-statement when there is a choice
-
-##### Reason
-
-* Readability.
-* Efficiency: A `switch` compares against constants and is usually better optimized than a series of tests in an `if`-`then`-`else` chain.
-* A `switch` enables some heuristic consistency checking. For example, have all values of an `enum` been covered? If not, is there a `default`?
-
-##### Example
-
-    void use(int n)
-    {
-        switch (n) {   // good
-        case 0:   // ...
-        case 7:   // ...
-        }
-    }
-
-rather than:
-
-    void use2(int n)
-    {
-        if (n == 0)   // bad: if-then-else chain comparing against a set of constants
-            // ...
-        else if (n == 7)
-            // ...
-    }
-
-##### Enforcement
-
-Flag `if`-`then`-`else` chains that check against constants (only).
-
-### <a name="Res-for-range"></a>ES.71: Prefer a range-`for`-statement to a `for`-statement when there is a choice
-
-##### Reason
-
-Readability. Error prevention. Efficiency.
-
-##### Example
-
-    for (int i = 0; i < v.size(); ++i)   // bad
-            cout << v[i] << '\n';
-
-    for (auto p = v.begin(); p != v.end(); ++p)   // bad
-        cout << *p << '\n';
-
-    for (auto& x : v)    // OK
-        cout << x << '\n';
-
-    for (int i = 1; i < v.size(); ++i) // touches two elements: can't be a range-for
-        cout << v[i] + v[i - 1] << '\n';
-
-    for (int i = 0; i < v.size(); ++i) // possible side effect: can't be a range-for
-        cout << f(v, &v[i]) << '\n';
-
-    for (int i = 0; i < v.size(); ++i) { // body messes with loop variable: can't be a range-for
-        if (i % 2 == 0)
-            continue;   // skip even elements
-        else
-            cout << v[i] << '\n';
-    }
-
-A human or a good static analyzer may determine that there really isn't a side effect on `v` in `f(v, &v[i])` so that the loop can be rewritten.
-
-"Messing with the loop variable" in the body of a loop is typically best avoided.
-
-##### Note
-
-Don't use expensive copies of the loop variable of a range-`for` loop:
-
-    for (string s : vs) // ...
-
-This will copy each elements of `vs` into `s`. Better:
-
-    for (string& s : vs) // ...
-
-Better still, if the loop variable isn't modified or copied:
-
-    for (const string& s : vs) // ...
-
-##### Enforcement
-
-Look at loops, if a traditional loop just looks at each element of a sequence, and there are no side effects on what it does with the elements, rewrite the loop to a ranged-`for` loop.
-
-### <a name="Res-for-while"></a>ES.72: Prefer a `for`-statement to a `while`-statement when there is an obvious loop variable
-
-##### Reason
-
-Readability: the complete logic of the loop is visible "up front". The scope of the loop variable can be limited.
-
-##### Example
-
-    for (int i = 0; i < vec.size(); i++) {
-        // do work
-    }
-
-##### Example, bad
-
-    int i = 0;
-    while (i < vec.size()) {
-        // do work
-        i++;
-    }
-
-##### Enforcement
-
-???
-
-### <a name="Res-while-for"></a>ES.73: Prefer a `while`-statement to a `for`-statement when there is no obvious loop variable
-
-##### Reason
-
-Readability.
-
-##### Example
-
-    int events = 0;
-    for (; wait_for_event(); ++events) {  // bad, confusing
-        // ...
-    }
-
-The "event loop" is misleading because the `events` counter has nothing to do with the loop condition (`wait_for_event()`).
-Better
-
-    int events = 0;
-    while (wait_for_event()) {      // better
-        ++events;
-        // ...
-    }
-
-##### Enforcement
-
-Flag actions in `for`-initializers and `for`-increments that do not relate to the `for`-condition.
-
-### <a name="Res-for-init"></a>ES.74: Prefer to declare a loop variable in the initializer part of a `for`-statement
-
-##### Reason
-
-Limit the loop variable visibility to the scope of the loop.
-Avoid using the loop variable for other purposes after the loop.
-
-##### Example
-
-    for (int i = 0; i < 100; ++i) {   // GOOD: i var is visible only inside the loop
-        // ...
-    }
-
-##### Example, don't
-
-    int j;                            // BAD: j is visible outside the loop
-    for (j = 0; j < 100; ++j) {
-        // ...
-    }
-    // j is still visible here and isn't needed
-
-**See also**: [Don't use a variable for two unrelated purposes](#Res-recycle)
-
-##### Example
-
-    for (string s; cin >> s; ) {
-        cout << s << '\n';
-    }
-
-##### Enforcement
-
-Warn when a variable modified inside the `for`-statement is declared outside the loop and not being used outside the loop.
-
-**Discussion**: Scoping the loop variable to the loop body also helps code optimizers greatly. Recognizing that the induction variable
-is only accessible in the loop body unblocks optimizations such as hoisting, strength reduction, loop-invariant code motion, etc.
-
-### <a name="Res-do"></a>ES.75: Avoid `do`-statements
-
-##### Reason
-
-Readability, avoidance of errors.
-The termination condition is at the end (where it can be overlooked) and the condition is not checked the first time through.
-
-##### Example
-
-    int x;
-    do {
-        cin >> x;
-        // ...
-    } while (x < 0);
-
-##### Note
-
-Yes, there are genuine examples where a `do`-statement is a clear statement of a solution, but also many bugs.
-
-##### Enforcement
-
-Flag `do`-statements.
-
-### <a name="Res-goto"></a>ES.76: Avoid `goto`
-
-##### Reason
-
-Readability, avoidance of errors. There are better control structures for humans; `goto` is for machine generated code.
-
-##### Exception
-
-Breaking out of a nested loop.
-In that case, always jump forwards.
-
-    for (int i = 0; i < imax; ++i)
-        for (int j = 0; j < jmax; ++j) {
-            if (a[i][j] > elem_max) goto finished;
-            // ...
-        }
-    finished:
-    // ...
-
-##### Example, bad
-
-There is a fair amount of use of the C goto-exit idiom:
-
-    void f()
-    {
-        // ...
-            goto exit;
-        // ...
-            goto exit;
-        // ...
-    exit:
-        // ... common cleanup code ...
-    }
-
-This is an ad-hoc simulation of destructors.
-Declare your resources with handles with destructors that clean up.
-If for some reason you cannot handle all cleanup with destructors for the variables used,
-consider `gsl::finally()` as a cleaner and more reliable alternative to `goto exit`
-
-##### Enforcement
-
-* Flag `goto`. Better still flag all `goto`s that do not jump from a nested loop to the statement immediately after a nest of loops.
-
-### <a name="Res-continue"></a>ES.77: Minimize the use of `break` and `continue` in loops
-
-##### Reason
-
- In a non-trivial loop body, it is easy to overlook a `break` or a `continue`.
-
- A `break` in a loop has a dramatically different meaning than a `break` in a `switch`-statement
- (and you can have `switch`-statement in a loop and a loop in a `switch`-case).
-
-##### Example
-
-    ???
-
-##### Alternative
-
-Often, a loop that requires a `break` is a good candidate for a function (algorithm), in which case the `break` becomes a `return`.
-
-    ???
-
-Often. a loop that uses `continue` can equivalently and as clearly be expressed by an `if`-statement.
-
-    ???
-
-##### Note
-
-If you really need to break out a loop, a `break` is typically better than alternatives such as [modifying the loop variable](#Res-loop-counter) or a [`goto`](#Res-goto):
-
-
-##### Enforcement
-
-???
-
-### <a name="Res-break"></a>ES.78: Always end a non-empty `case` with a `break`
-
-##### Reason
-
- Accidentally leaving out a `break` is a fairly common bug.
- A deliberate fallthrough is a maintenance hazard.
-
-##### Example
-
-    switch (eventType)
-    {
-    case Information:
-        update_status_bar();
-        break;
-    case Warning:
-        write_event_log();
-    case Error:
-        display_error_window(); // Bad
-        break;
-    }
-
-It is easy to overlook the fallthrough. Be explicit:
-
-    switch (eventType)
-    {
-    case Information:
-        update_status_bar();
-        break;
-    case Warning:
-        write_event_log();
-        // fallthrough
-    case Error:
-        display_error_window(); // Bad
-        break;
-    }
-
-In C++17, use a `[[fallthrough]]` annotation:
-
-    switch (eventType)
-    {
-    case Information:
-        update_status_bar();
-        break;
-    case Warning:
-        write_event_log();
-        [[fallthrough]];        // C++17
-    case Error:
-        display_error_window(); // Bad
-        break;
-    }
-
-##### Note
-
-Multiple case labels of a single statement is OK:
-
-    switch (x) {
-    case 'a':
-    case 'b':
-    case 'f':
-        do_something(x);
-        break;
-    }
-
-##### Enforcement
-
-Flag all fallthroughs from non-empty `case`s.
-
-### <a name="Res-default"></a>ES.79: Use `default` to handle common cases (only)
-
-##### Reason
-
- Code clarity.
- Improved opportunities for error detection.
-
-##### Example
-
-    enum E { a, b, c , d };
-
-    void f1(E x)
-    {
-        switch (x) {
-        case a:
-            do_something();
-            break;
-        case b:
-            do_something_else();
-            break;
-        default:
-            take_the_default_action();
-            break;
-        }
-    }
-
-Here it is clear that there is a default action and that cases `a` and `b` are special.
-
-##### Example
-
-But what if there is no default action and you mean to handle only specific cases?
-In that case, have an empty default or else it is impossible to know if you meant to handle all cases:
-
-    void f2(E x)
-    {
-        switch (x) {
-        case a:
-            do_something();
-            break;
-        case b:
-            do_something_else();
-            break;
-        default:
-            // do nothing for the rest of the cases
-            break;
-        }
-    }
-
-If you leave out the `default`, a maintainer and/or a compiler may reasonably assume that you intended to handle all cases:
-
-    void f2(E x)
-    {
-        switch (x) {
-        case a:
-            do_something();
-            break;
-        case b:
-        case c:
-            do_something_else();
-            break;
-        }
-    }
-
-Did you forget case `d` or deliberately leave it out?
-Forgetting a case typically happens when a case is added to an enumeration and the person doing so fails to add it to every
-switch over the enumerators.
-
-##### Enforcement
-
-Flag `switch`-statements over an enumeration that don't handle all enumerators and do not have a `default`.
-This may yield too many false positives in some code bases; if so, flag only `switch`es that handle most but not all cases
-(that was the strategy of the very first C++ compiler).
-
-### <a name="Res-noname"></a>ES.84: Don't (try to) declare a local variable with no name
-
-##### Reason
-
-There is no such thing.
-What looks to a human like a variable without a name is to the compiler a statement consisting of a temporary that immediately goes out of scope.
-To avoid unpleasant surprises.
-
-##### Example, bad
-
-    void f()
-    {
-        lock<mutex>{mx};   // Bad
-        // ...
-    }
-
-This declares an unnamed `lock` object that immediately goes out of scope at the point of the semicolon.
-This is not an uncommon mistake.
-In particular, this particular example can lead to hard-to find race conditions.
-There are exceedingly clever used of this "idiom", but they are far rarer than the mistakes.
-
-##### Note
-
-Unnamed function arguments are fine.
-
-##### Enforcement
-
-Flag statements that are just a temporary
-
-### <a name="Res-empty"></a>ES.85: Make empty statements visible
-
-##### Reason
-
-Readability.
-
-##### Example
-
-    for (i = 0; i < max; ++i);   // BAD: the empty statement is easily overlooked
-    v[i] = f(v[i]);
-
-    for (auto x : v) {           // better
-        // nothing
-    }
-    v[i] = f(v[i]);
-
-##### Enforcement
-
-Flag empty statements that are not blocks and don't contain comments.
-
-### <a name="Res-loop-counter"></a>ES.86: Avoid modifying loop control variables inside the body of raw for-loops
-
-##### Reason
-
-The loop control up front should enable correct reasoning about what is happening inside the loop. Modifying loop counters in both the iteration-expression and inside the body of the loop is a perennial source of surprises and bugs.
-
-##### Example
-
-    for (int i = 0; i < 10; ++i) {
-        // no updates to i -- ok
-    }
-
-    for (int i = 0; i < 10; ++i) {
-        //
-        if (/* something */) ++i; // BAD
-        //
-    }
-
-    bool skip = false;
-    for (int i = 0; i < 10; ++i) {
-        if (skip) { skip = false; continue; }
-        //
-        if (/* something */) skip = true;  // Better: using two variable for two concepts.
-        //
-    }
-
-##### Enforcement
-
-Flag variables that are potentially updated (have a non-`const` use) in both the loop control iteration-expression and the loop body.
 
 ## ES.expr: Expressions
 
@@ -11593,7 +11078,7 @@ A key example is basic narrowing:
 
 ##### Note
 
-The guideline support library offers a `narrow` operation for specifying that narrowing is acceptable and a `narrow` ("narrow if") that throws an exception if a narrowing would throw away information:
+The guideline support library offers a `narrow_cast` operation for specifying that narrowing is acceptable and a `narrow` ("narrow if") that throws an exception if a narrowing would throw away information:
 
     i = narrow_cast<int>(d);   // OK (you asked for it): narrowing: i becomes 7
     i = narrow<int>(d);        // OK: throws narrowing_error
@@ -11683,6 +11168,10 @@ are seriously overused as well as a major source of errors.
 
 If you feel the need for a lot of casts, there may be a fundamental design problem.
 
+##### Exception
+
+Casting to `(void)` is the Standard-sanctioned way to turn off `[[nodiscard]]` warnings. If you are calling a function with a `[[nodiscard]]` return and you deliberately want to discard the result, first think hard about whether that is really a good idea (there is usually a good reason the author of the function or of the return type used `[[nodiscard]]` in the first place), but if you still think it's appropriate and your code reviewer agrees, write `(void)` to turn off the warning.
+
 ##### Alternatives
 
 Casts are widely (mis) used. Modern C++ has rules and constructs that eliminate the need for casts in many contexts, such as
@@ -11693,7 +11182,7 @@ Casts are widely (mis) used. Modern C++ has rules and constructs that eliminate 
 
 ##### Enforcement
 
-* Force the elimination of C-style casts
+* Force the elimination of C-style casts, except on a function with a `[[nodiscard]]` return
 * Warn if there are many functional style casts (there is an obvious problem in quantifying 'many')
 * The [type profile](#Pro-type-reinterpretcast) bans `reinterpret_cast`.
 * Warn against [identity casts](#Pro-type-identitycast) between pointer types, where the source and target types are the same (#Pro-type-identitycast)
@@ -12337,7 +11826,7 @@ Unfortunately, most invalid pointer problems are harder to spot and harder to fi
 
 There is a huge amount of such code.
 Most works -- after lots of testing -- but in isolation it is impossible to tell whether `p` could be the `nullptr`.
-Consequently, it this is also a major source of errors.
+Consequently, this is also a major source of errors.
 There are many approaches to dealing with this potential problem:
 
     void f1(int* p) // deal with nullptr
@@ -12412,6 +11901,562 @@ This rule is part of the [lifetime profile](#Pro.lifetime)
 * Flag a dereference of a pointer that may have been invalidated by assigning a `nullptr`
 * Flag a dereference of a pointer that may have been invalidated by a `delete`
 * Flag a dereference to a pointer to a container element that may have been invalidated by dereference
+
+
+## ES.stmt: Statements
+
+Statements control the flow of control (except for function calls and exception throws, which are expressions).
+
+### <a name="Res-switch-if"></a>ES.70: Prefer a `switch`-statement to an `if`-statement when there is a choice
+
+##### Reason
+
+* Readability.
+* Efficiency: A `switch` compares against constants and is usually better optimized than a series of tests in an `if`-`then`-`else` chain.
+* A `switch` enables some heuristic consistency checking. For example, have all values of an `enum` been covered? If not, is there a `default`?
+
+##### Example
+
+    void use(int n)
+    {
+        switch (n) {   // good
+        case 0:   // ...
+        case 7:   // ...
+        }
+    }
+
+rather than:
+
+    void use2(int n)
+    {
+        if (n == 0)   // bad: if-then-else chain comparing against a set of constants
+            // ...
+        else if (n == 7)
+            // ...
+    }
+
+##### Enforcement
+
+Flag `if`-`then`-`else` chains that check against constants (only).
+
+### <a name="Res-for-range"></a>ES.71: Prefer a range-`for`-statement to a `for`-statement when there is a choice
+
+##### Reason
+
+Readability. Error prevention. Efficiency.
+
+##### Example
+
+    for (int i = 0; i < v.size(); ++i)   // bad
+            cout << v[i] << '\n';
+
+    for (auto p = v.begin(); p != v.end(); ++p)   // bad
+        cout << *p << '\n';
+
+    for (auto& x : v)    // OK
+        cout << x << '\n';
+
+    for (int i = 1; i < v.size(); ++i) // touches two elements: can't be a range-for
+        cout << v[i] + v[i - 1] << '\n';
+
+    for (int i = 0; i < v.size(); ++i) // possible side effect: can't be a range-for
+        cout << f(v, &v[i]) << '\n';
+
+    for (int i = 0; i < v.size(); ++i) { // body messes with loop variable: can't be a range-for
+        if (i % 2 == 0)
+            continue;   // skip even elements
+        else
+            cout << v[i] << '\n';
+    }
+
+A human or a good static analyzer may determine that there really isn't a side effect on `v` in `f(v, &v[i])` so that the loop can be rewritten.
+
+"Messing with the loop variable" in the body of a loop is typically best avoided.
+
+##### Note
+
+Don't use expensive copies of the loop variable of a range-`for` loop:
+
+    for (string s : vs) // ...
+
+This will copy each elements of `vs` into `s`. Better:
+
+    for (string& s : vs) // ...
+
+Better still, if the loop variable isn't modified or copied:
+
+    for (const string& s : vs) // ...
+
+##### Enforcement
+
+Look at loops, if a traditional loop just looks at each element of a sequence, and there are no side effects on what it does with the elements, rewrite the loop to a ranged-`for` loop.
+
+### <a name="Res-for-while"></a>ES.72: Prefer a `for`-statement to a `while`-statement when there is an obvious loop variable
+
+##### Reason
+
+Readability: the complete logic of the loop is visible "up front". The scope of the loop variable can be limited.
+
+##### Example
+
+    for (int i = 0; i < vec.size(); i++) {
+        // do work
+    }
+
+##### Example, bad
+
+    int i = 0;
+    while (i < vec.size()) {
+        // do work
+        i++;
+    }
+
+##### Enforcement
+
+???
+
+### <a name="Res-while-for"></a>ES.73: Prefer a `while`-statement to a `for`-statement when there is no obvious loop variable
+
+##### Reason
+
+Readability.
+
+##### Example
+
+    int events = 0;
+    for (; wait_for_event(); ++events) {  // bad, confusing
+        // ...
+    }
+
+The "event loop" is misleading because the `events` counter has nothing to do with the loop condition (`wait_for_event()`).
+Better
+
+    int events = 0;
+    while (wait_for_event()) {      // better
+        ++events;
+        // ...
+    }
+
+##### Enforcement
+
+Flag actions in `for`-initializers and `for`-increments that do not relate to the `for`-condition.
+
+### <a name="Res-for-init"></a>ES.74: Prefer to declare a loop variable in the initializer part of a `for`-statement
+
+##### Reason
+
+Limit the loop variable visibility to the scope of the loop.
+Avoid using the loop variable for other purposes after the loop.
+
+##### Example
+
+    for (int i = 0; i < 100; ++i) {   // GOOD: i var is visible only inside the loop
+        // ...
+    }
+
+##### Example, don't
+
+    int j;                            // BAD: j is visible outside the loop
+    for (j = 0; j < 100; ++j) {
+        // ...
+    }
+    // j is still visible here and isn't needed
+
+**See also**: [Don't use a variable for two unrelated purposes](#Res-recycle)
+
+##### Example
+
+    for (string s; cin >> s; ) {
+        cout << s << '\n';
+    }
+
+##### Enforcement
+
+Warn when a variable modified inside the `for`-statement is declared outside the loop and not being used outside the loop.
+
+**Discussion**: Scoping the loop variable to the loop body also helps code optimizers greatly. Recognizing that the induction variable
+is only accessible in the loop body unblocks optimizations such as hoisting, strength reduction, loop-invariant code motion, etc.
+
+### <a name="Res-do"></a>ES.75: Avoid `do`-statements
+
+##### Reason
+
+Readability, avoidance of errors.
+The termination condition is at the end (where it can be overlooked) and the condition is not checked the first time through.
+
+##### Example
+
+    int x;
+    do {
+        cin >> x;
+        // ...
+    } while (x < 0);
+
+##### Note
+
+Yes, there are genuine examples where a `do`-statement is a clear statement of a solution, but also many bugs.
+
+##### Enforcement
+
+Flag `do`-statements.
+
+### <a name="Res-goto"></a>ES.76: Avoid `goto`
+
+##### Reason
+
+Readability, avoidance of errors. There are better control structures for humans; `goto` is for machine generated code.
+
+##### Exception
+
+Breaking out of a nested loop.
+In that case, always jump forwards.
+
+    for (int i = 0; i < imax; ++i)
+        for (int j = 0; j < jmax; ++j) {
+            if (a[i][j] > elem_max) goto finished;
+            // ...
+        }
+    finished:
+    // ...
+
+##### Example, bad
+
+There is a fair amount of use of the C goto-exit idiom:
+
+    void f()
+    {
+        // ...
+            goto exit;
+        // ...
+            goto exit;
+        // ...
+    exit:
+        // ... common cleanup code ...
+    }
+
+This is an ad-hoc simulation of destructors.
+Declare your resources with handles with destructors that clean up.
+If for some reason you cannot handle all cleanup with destructors for the variables used,
+consider `gsl::finally()` as a cleaner and more reliable alternative to `goto exit`
+
+##### Enforcement
+
+* Flag `goto`. Better still flag all `goto`s that do not jump from a nested loop to the statement immediately after a nest of loops.
+
+### <a name="Res-continue"></a>ES.77: Minimize the use of `break` and `continue` in loops
+
+##### Reason
+
+ In a non-trivial loop body, it is easy to overlook a `break` or a `continue`.
+
+ A `break` in a loop has a dramatically different meaning than a `break` in a `switch`-statement
+ (and you can have `switch`-statement in a loop and a loop in a `switch`-case).
+
+##### Example
+
+    ???
+
+##### Alternative
+
+Often, a loop that requires a `break` is a good candidate for a function (algorithm), in which case the `break` becomes a `return`.
+
+    ???
+
+Often. a loop that uses `continue` can equivalently and as clearly be expressed by an `if`-statement.
+
+    ???
+
+##### Note
+
+If you really need to break out a loop, a `break` is typically better than alternatives such as [modifying the loop variable](#Res-loop-counter) or a [`goto`](#Res-goto):
+
+
+##### Enforcement
+
+???
+
+### <a name="Res-break"></a>ES.78: Always end a non-empty `case` with a `break`
+
+##### Reason
+
+ Accidentally leaving out a `break` is a fairly common bug.
+ A deliberate fallthrough is a maintenance hazard.
+
+##### Example
+
+    switch (eventType) {
+    case Information:
+        update_status_bar();
+        break;
+    case Warning:
+        write_event_log();
+    case Error:
+        display_error_window(); // Bad
+        break;
+    }
+
+It is easy to overlook the fallthrough. Be explicit:
+
+    switch (eventType) {
+    case Information:
+        update_status_bar();
+        break;
+    case Warning:
+        write_event_log();
+        // fallthrough
+    case Error:
+        display_error_window(); // Bad
+        break;
+    }
+
+In C++17, use a `[[fallthrough]]` annotation:
+
+    switch (eventType) {
+    case Information:
+        update_status_bar();
+        break;
+    case Warning:
+        write_event_log();
+        [[fallthrough]];        // C++17
+    case Error:
+        display_error_window(); // Bad
+        break;
+    }
+
+##### Note
+
+Multiple case labels of a single statement is OK:
+
+    switch (x) {
+    case 'a':
+    case 'b':
+    case 'f':
+        do_something(x);
+        break;
+    }
+
+##### Enforcement
+
+Flag all fallthroughs from non-empty `case`s.
+
+### <a name="Res-default"></a>ES.79: Use `default` to handle common cases (only)
+
+##### Reason
+
+ Code clarity.
+ Improved opportunities for error detection.
+
+##### Example
+
+    enum E { a, b, c , d };
+
+    void f1(E x)
+    {
+        switch (x) {
+        case a:
+            do_something();
+            break;
+        case b:
+            do_something_else();
+            break;
+        default:
+            take_the_default_action();
+            break;
+        }
+    }
+
+Here it is clear that there is a default action and that cases `a` and `b` are special.
+
+##### Example
+
+But what if there is no default action and you mean to handle only specific cases?
+In that case, have an empty default or else it is impossible to know if you meant to handle all cases:
+
+    void f2(E x)
+    {
+        switch (x) {
+        case a:
+            do_something();
+            break;
+        case b:
+            do_something_else();
+            break;
+        default:
+            // do nothing for the rest of the cases
+            break;
+        }
+    }
+
+If you leave out the `default`, a maintainer and/or a compiler may reasonably assume that you intended to handle all cases:
+
+    void f2(E x)
+    {
+        switch (x) {
+        case a:
+            do_something();
+            break;
+        case b:
+        case c:
+            do_something_else();
+            break;
+        }
+    }
+
+Did you forget case `d` or deliberately leave it out?
+Forgetting a case typically happens when a case is added to an enumeration and the person doing so fails to add it to every
+switch over the enumerators.
+
+##### Enforcement
+
+Flag `switch`-statements over an enumeration that don't handle all enumerators and do not have a `default`.
+This may yield too many false positives in some code bases; if so, flag only `switch`es that handle most but not all cases
+(that was the strategy of the very first C++ compiler).
+
+### <a name="Res-noname"></a>ES.84: Don't (try to) declare a local variable with no name
+
+##### Reason
+
+There is no such thing.
+What looks to a human like a variable without a name is to the compiler a statement consisting of a temporary that immediately goes out of scope.
+To avoid unpleasant surprises.
+
+##### Example, bad
+
+    void f()
+    {
+        lock<mutex>{mx};   // Bad
+        // ...
+    }
+
+This declares an unnamed `lock` object that immediately goes out of scope at the point of the semicolon.
+This is not an uncommon mistake.
+In particular, this particular example can lead to hard-to find race conditions.
+There are exceedingly clever uses of this "idiom", but they are far rarer than the mistakes.
+
+##### Note
+
+Unnamed function arguments are fine.
+
+##### Enforcement
+
+Flag statements that are just a temporary
+
+### <a name="Res-empty"></a>ES.85: Make empty statements visible
+
+##### Reason
+
+Readability.
+
+##### Example
+
+    for (i = 0; i < max; ++i);   // BAD: the empty statement is easily overlooked
+    v[i] = f(v[i]);
+
+    for (auto x : v) {           // better
+        // nothing
+    }
+    v[i] = f(v[i]);
+
+##### Enforcement
+
+Flag empty statements that are not blocks and don't contain comments.
+
+### <a name="Res-loop-counter"></a>ES.86: Avoid modifying loop control variables inside the body of raw for-loops
+
+##### Reason
+
+The loop control up front should enable correct reasoning about what is happening inside the loop. Modifying loop counters in both the iteration-expression and inside the body of the loop is a perennial source of surprises and bugs.
+
+##### Example
+
+    for (int i = 0; i < 10; ++i) {
+        // no updates to i -- ok
+    }
+
+    for (int i = 0; i < 10; ++i) {
+        //
+        if (/* something */) ++i; // BAD
+        //
+    }
+
+    bool skip = false;
+    for (int i = 0; i < 10; ++i) {
+        if (skip) { skip = false; continue; }
+        //
+        if (/* something */) skip = true;  // Better: using two variable for two concepts.
+        //
+    }
+
+##### Enforcement
+
+Flag variables that are potentially updated (have a non-`const` use) in both the loop control iteration-expression and the loop body.
+
+
+### <a name="Res-if"></a>ES.87: Don't add redundant `==` or `!=` to conditions
+
+##### Reason
+
+Doing so avoids verbosity and eliminates some opportunities for mistakes.
+Helps make style consistent and conventional.
+
+##### Example
+
+By definition, a condition in an `if`-statement, `while`-statement, or a `for`-statement selects between `true` and `false`.
+A numeric value is compared to `0` and a pointer value to `nullptr`.
+
+    // These all mean "if `p` is not `nullptr`"
+    if (p) { ... }            // good
+    if (p != 0) { ... }       // redundant `!=0`; bad: don't use 0 for pointers
+    if (p != nullptr) { ... } // redundant `!=nullptr`, not recommended
+
+Often, `if (p)` is read as "if `p` is valid" which is a direct expression of the programmers intent,
+whereas `if (p != nullptr)` would be a long-winded workaround.
+
+##### Example
+
+This rule is especially useful when a declaration is used as a condition
+
+    if (auto pc = dynamic_cast<Circle>(ps)) { ... } // execute is ps points to a kind of Circle, good
+
+    if (auto pc = dynamic_cast<Circle>(ps); pc != nullptr) { ... } // not recommended
+
+##### Example
+
+Note that implicit conversions to bool are applied in conditions.
+For example:
+
+    for (string s; cin >> s; ) v.push_back(s);
+
+This invokes `istream`'s `operator bool()`.
+
+##### Example, bad
+
+It has been noted that
+
+    if(strcmp(p1, p2)) { ... }   // are the two C-style strings equal? (mistake!)
+
+is a common beginners error.
+If you use C-style strings, you must know the `<cstring>` functions well.
+Being verbose and writing 
+
+    if(strcmp(p1, p2) != 0) { ... }   // are the two C-style strings equal? (mistake!)
+
+would not save you.
+
+##### Note
+
+The opposite condition is most easily expressed using a negation:
+
+    // These all mean "if `p` is `nullptr`"
+    if (!p) { ... }           // good
+    if (p == 0) { ... }       // redundant `!= 0`; bad: don't use `0` for pointers
+    if (p == nullptr) { ... } // redundant `== nullptr`, not recommended
+
+##### Enforcement
+
+Easy, just check for redundant use of `!=` and `==` in conditions.
+
+
 
 ## <a name="SS-numbers"></a>Arithmetic
 
@@ -12634,10 +12679,10 @@ Using `unsigned` doesn't actually eliminate the possibility of negative values.
 
 ##### Example
 
-    unsigned int u1 = -2;   // OK: the value of u1 is 4294967294
+    unsigned int u1 = -2;   // Valid: the value of u1 is 4294967294
     int i1 = -2;
-    unsigned int u2 = i1;   // OK: the value of u2 is 4294967294
-    int i2 = u2;            // OK: the value of i2 is -2
+    unsigned int u2 = i1;   // Valid: the value of u2 is 4294967294
+    int i2 = u2;            // Valid: the value of i2 is -2
 
 These problems with such (perfectly legal) constructs are hard to spot in real code and are the source of many real-world errors.
 Consider:
@@ -13256,7 +13301,7 @@ Local static variables are a common source of data races.
         // ...
         auto h1 = async([&]{ sort(par, s); });     // spawn a task to sort
         // ...
-        auto h2 = async([&]{ return find_all(buf, sz, pat); });   // span a task to find matches
+        auto h2 = async([&]{ return find_all(buf, sz, pat); });   // spawn a task to find matches
         // ...
     }
 
@@ -13319,23 +13364,20 @@ The less sharing you do, the less chance you have to wait on a lock (so performa
     Image altitude_map(const vector<Reading>&);
     // ...
 
-    void process_readings(istream& socket1)
+    void process_readings(const vector<Reading>& surface_readings)
     {
-        vector<Reading> surface_readings;
-        socket1 >> surface_readings;
-        if (!socket1) throw Bad_input{};
-
         auto h1 = async([&] { if (!validate(surface_readings)) throw Invalid_data{}; });
         auto h2 = async([&] { return temperature_gradiants(surface_readings); });
         auto h3 = async([&] { return altitude_map(surface_readings); });
         // ...
-        auto v1 = h1.get();
+        h1.get();
         auto v2 = h2.get();
         auto v3 = h3.get();
         // ...
     }
 
 Without those `const`s, we would have to review every asynchronously invoked function for potential data races on `surface_readings`.
+Making `surface_readings` be `const` (with respect to this function) allow reasoning using only the function body.
 
 ##### Note
 
@@ -13357,7 +13399,14 @@ Application concepts are easier to reason about.
 
 ##### Example
 
-    ???
+    void some_fun() {
+        std::string  msg, msg2;
+        std::thread publisher([&] { msg = "Hello"; });       // bad: less expressive
+                                                             //      and more error-prone
+        auto pubtask = std::async([&] { msg2 = "Hello"; });  // OK
+        // ...
+        publisher.join();
+    }
 
 ##### Note
 
@@ -13544,12 +13593,12 @@ This is asking for deadlock:
 Instead, use `lock()`:
 
     // thread 1
-    lock(lck1, lck2);
+    lock(m1, m2);
     lock_guard<mutex> lck1(m1, adopt_lock);
     lock_guard<mutex> lck2(m2, adopt_lock);
 
     // thread 2
-    lock(lck2, lck1);
+    lock(m2, m1);
     lock_guard<mutex> lck2(m2, adopt_lock);
     lock_guard<mutex> lck1(m1, adopt_lock);
 
@@ -14680,8 +14729,8 @@ Not all member functions can be called.
         // if elem != nullptr then elem points to sz doubles
     public:
         Vector() : elem{nullptr}, sz{0}{}
-        Vector(int s) : elem{new double}, sz{s} { /* initialize elements */ }
-        ~Vector() { delete elem; }
+        Vector(int s) : elem{new double[s]}, sz{s} { /* initialize elements */ }
+        ~Vector() { delete [] elem; }
         double& operator[](int s) { return elem[s]; }
         // ...
     private:
@@ -15052,7 +15101,7 @@ The standard library assumes that destructors, deallocation functions (e.g., `op
 
 Deallocation functions, including `operator delete`, must be `noexcept`. `swap` functions must be `noexcept`.
 Most destructors are implicitly `noexcept` by default.
-Also, [make move operations `noexcept`](##Rc-move-noexcept).
+Also, [make move operations `noexcept`](#Rc-move-noexcept).
 
 ##### Enforcement
 
@@ -15153,7 +15202,7 @@ Consider `finally` a last resort.
 
 ##### Note
 
-Use of `finally` is a systematic and reasonably clean alternative to the old [`goto exit;` technique](##Re-no-throw-codes)
+Use of `finally` is a systematic and reasonably clean alternative to the old [`goto exit;` technique](#Re-no-throw-codes)
 for dealing with cleanup where resource management is not systematic.
 
 ##### Enforcement
@@ -16215,11 +16264,11 @@ and should be used only as building blocks for meaningful concepts, rather than 
 
     int x = 7;
     int y = 9;
-    auto z = plus(x, y);   // z = 16
+    auto z = algo(x, y);   // z = 16
 
     string xx = "7";
     string yy = "9";
-    auto zz = plus(xx, yy);   // zz = "79"
+    auto zz = algo(xx, yy);   // zz = "79"
 
 Maybe the concatenation was expected. More likely, it was an accident. Defining minus equivalently would give dramatically different sets of accepted types.
 This `Addable` violates the mathematical rule that addition is supposed to be commutative: `a+b == b+a`.
@@ -16245,11 +16294,11 @@ The ability to specify a meaningful semantics is a defining characteristic of a 
 
     int x = 7;
     int y = 9;
-    auto z = plus(x, y);   // z = 18
+    auto z = algo(x, y);   // z = 18
 
     string xx = "7";
     string yy = "9";
-    auto zz = plus(xx, yy);   // error: string is not a Number
+    auto zz = algo(xx, yy);   // error: string is not a Number
 
 ##### Note
 
@@ -16800,8 +16849,8 @@ Flag uses where an explicitly specialized type exactly matches the types of the 
         explicit X(int);
         X(const X&);            // copy
         X operator=(const X&);
-        X(X&&);                 // move
-        X& operator=(X&&);
+        X(X&&) noexcept;                 // move
+        X& operator=(X&&) noexcept;
         ~X();
         // ... no more constructors ...
     };
@@ -17937,7 +17986,7 @@ Source file rule summary:
 * [SF.4: Include `.h` files before other declarations in a file](#Rs-include-order)
 * [SF.5: A `.cpp` file must include the `.h` file(s) that defines its interface](#Rs-consistency)
 * [SF.6: Use `using namespace` directives for transition, for foundation libraries (such as `std`), or within a local scope (only)](#Rs-using)
-* [SF.7: Don't write `using namespace` in a header file](#Rs-using-directive)
+* [SF.7: Don't write `using namespace` at global scope in a header file](#Rs-using-directive)
 * [SF.8: Use `#include` guards for all `.h` files](#Rs-guards)
 * [SF.9: Avoid cyclic dependencies among source files](#Rs-cycles)
 * [SF.10: Avoid dependencies on implicitly `#include`d names](#Rs-implicit)
@@ -18195,11 +18244,11 @@ and M functions each containing a `using namespace X`with N lines of code in tot
 
 Flag multiple `using namespace` directives for different namespaces in a single source file.
 
-### <a name="Rs-using-directive"></a>SF.7: Don't write `using namespace` in a header file
+### <a name="Rs-using-directive"></a>SF.7: Don't write `using namespace` at global scope in a header file
 
 ##### Reason
 
-Doing so takes away an `#include`r's ability to effectively disambiguate and to use alternatives.
+Doing so takes away an `#include`r's ability to effectively disambiguate and to use alternatives. It also makes `#include`d headers order-dependent as they may have different meaning when included in different orders.
 
 ##### Example
 
@@ -18459,7 +18508,7 @@ Because, obviously, breaking this rule can lead to undefined behavior, memory co
 ##### Note
 
 This is a semi-philosophical meta-rule, which needs many supporting concrete rules.
-We need it as a umbrella for the more specific rules.
+We need it as an umbrella for the more specific rules.
 
 Summary of more specific rules:
 
@@ -18755,7 +18804,7 @@ Distinguishing these alternatives prevents misunderstandings and bugs.
 All we know is that it is supposed to be the nullptr or point to at least one character
 
     void f1(zstring s);     // s is a C-style string or the nullptr
-    void f1(czstring s);    // s is a C-style string that is not the nullptr
+    void f1(czstring s);    // s is a C-style string constant or the nullptr
     void f1(std::byte* s);  // s is a pointer to a byte (C++17)
 
 ##### Note
@@ -19011,7 +19060,7 @@ Synchronizing `iostreams` with `printf-style` I/O can be costly.
 
 ### <a name="Rio-endl"></a>SL.io.50: Avoid `endl`
 
-### Reason
+##### Reason
 
 The `endl` manipulator is mostly equivalent to `'\n'` and `"\n"`;
 as most commonly used it simply slows down output by doing redundant `flush()`s.
@@ -19295,7 +19344,7 @@ Many, possibly most, problems with exceptions stem from historical needs to inte
 
 The fundamental arguments for the use of exceptions are
 
-* They clearly separates error return from ordinary return
+* They clearly differentiate between erroneous return and ordinary return
 * They cannot be forgotten or ignored
 * They can be used systematically
 
@@ -19748,7 +19797,7 @@ These types allow the user to distinguish between owning and non-owning pointers
 
 These "views" are never owners.
 
-References are never owners. Note: References have many opportunities to outlive the objects they refer to (returning a local variable by reference, holding a reference to an element of a vector and doing `push_back`, binding to `std::max(x, y + 1)`, etc. The Lifetime safety profile aims to address those things, but even so `owner<T&>` does not make sense and is discouraged.
+References are never owners (see [R.4](#Rr-ref). Note: References have many opportunities to outlive the objects they refer to (returning a local variable by reference, holding a reference to an element of a vector and doing `push_back`, binding to `std::max(x, y + 1)`, etc. The Lifetime safety profile aims to address those things, but even so `owner<T&>` does not make sense and is discouraged.
 
 The names are mostly ISO standard-library style (lower case and underscore):
 
@@ -20283,15 +20332,15 @@ In the context of C++, this style is often called "Stroustrup".
         }
 
         switch (x) {
-            case 0:
-                // ...
-                break;
-            case amazing:
-                // ...
-                break;
-            default:
-                // ...
-                break;
+        case 0:
+            // ...
+            break;
+        case amazing:
+            // ...
+            break;
+        default:
+            // ...
+            break;
         }
 
         if (0 < x)
@@ -20313,7 +20362,7 @@ Use separate lines for each statement, the branches of an `if`, and the body of 
 
 ##### Note
 
-The `{` for a `class` and a `struct` in *not* on a separate line, but the `{` for a function is.
+The `{` for a `class` and a `struct` is *not* on a separate line, but the `{` for a function is.
 
 ##### Note
 
@@ -20646,16 +20695,16 @@ Here is an example of the last option:
     class B {
     protected:
         B() { /* ... */ }
-        virtual void PostInitialize()    // called right after construction
+        virtual void post_initialize()    // called right after construction
             { /* ... */ f(); /* ... */ }   // GOOD: virtual dispatch is safe
     public:
         virtual void f() = 0;
 
         template<class T>
-        static shared_ptr<T> Create()    // interface for creating objects
+        static shared_ptr<T> create()    // interface for creating objects
         {
             auto p = make_shared<T>();
-            p->PostInitialize();
+            p->post_initialize();
             return p;
         }
     };
@@ -20755,7 +20804,7 @@ In this rare case, you could make the destructor public and nonvirtual but clear
 
 In general, however, avoid concrete base classes (see Item 35). For example, `unary_function` is a bundle-of-typedefs that was never intended to be instantiated standalone. It really makes no sense to give it a public destructor; a better design would be to follow this Item's advice and give it a protected nonvirtual destructor.
 
-**References**: [\[C++CS\]](#C++CS) Item 50, [\[Cargill92\]](#Cargill92) pp. 77-79, 207, [\[Cline99\]](#Cline99) §21.06, 21.12-13, [\[Henricson97\]](#Henricson97) pp. 110-114, [\[Koenig97\]](#Koenig97) Chapters 4, 11, [\[Meyers97\]](#Meyers97) §14, [\[Stroustrup00\]](#Stroustrup00) §12.4.2, [\[Sutter02\]](#Sutter02) §27, [\[Sutter04\]](#Sutter04) §18
+**References**: [\[C++CS\]](#CplusplusCS) Item 50, [\[Cargill92\]](#Cargill92) pp. 77-79, 207, [\[Cline99\]](#Cline99) §21.06, 21.12-13, [\[Henricson97\]](#Henricson97) pp. 110-114, [\[Koenig97\]](#Koenig97) Chapters 4, 11, [\[Meyers97\]](#Meyers97) §14, [\[Stroustrup00\]](#Stroustrup00) §12.4.2, [\[Sutter02\]](#Sutter02) §27, [\[Sutter04\]](#Sutter04) §18
 
 ### <a name="Sd-noexcept"></a>Discussion: Usage of noexcept
 
@@ -20829,9 +20878,9 @@ These are key functions that must not fail because they are necessary for the tw
 
 Consider the following advice and requirements found in the C++ Standard:
 
-> If a destructor called during stack unwinding exits with an exception, terminate is called (15.5.1). So destructors should generally catch exceptions and not let them propagate out of the destructor. --[\[C++03\]](#C++03) §15.2(3)
+> If a destructor called during stack unwinding exits with an exception, terminate is called (15.5.1). So destructors should generally catch exceptions and not let them propagate out of the destructor. --[\[C++03\]](#Cplusplus03) §15.2(3)
 >
-> No destructor operation defined in the C++ Standard Library (including the destructor of any type that is used to instantiate a standard-library template) will throw an exception. --[\[C++03\]](#C++03) §17.4.4.8(3)
+> No destructor operation defined in the C++ Standard Library (including the destructor of any type that is used to instantiate a standard-library template) will throw an exception. --[\[C++03\]](#Cplusplus03) §17.4.4.8(3)
 
 Deallocation functions, including specifically overloaded `operator delete` and `operator delete[]`, fall into the same category, because they too are used during cleanup in general, and during exception handling in particular, to back out of partial work that needs to be undone.
 Besides destructors and deallocation functions, common error-safety techniques rely also on `swap` operations never failing -- in this case, not because they are used to implement a guaranteed rollback, but because they are used to implement a guaranteed commit. For example, here is an idiomatic implementation of `operator=` for a type `T` that performs copy construction followed by a call to a no-fail `swap`:
@@ -20847,7 +20896,7 @@ Fortunately, when releasing a resource, the scope for failure is definitely smal
 
 When using exceptions as your error handling mechanism, always document this behavior by declaring these functions `noexcept`. (See Item 75.)
 
-**References**: [\[C++CS\]](#C++CS) Item 51; [\[C++03\]](#C++03) §15.2(3), §17.4.4.8(3), [\[Meyers96\]](#Meyers96) §11, [\[Stroustrup00\]](#Stroustrup00) §14.4.7, §E.2-4, [\[Sutter00\]](#Sutter00) §8, §16, [\[Sutter02\]](#Sutter02) §18-19
+**References**: [\[C++CS\]](#CplusplusCS) Item 51; [\[C++03\]](#Cplusplus03) §15.2(3), §17.4.4.8(3), [\[Meyers96\]](#Meyers96) §11, [\[Stroustrup00\]](#Stroustrup00) §14.4.7, §E.2-4, [\[Sutter00\]](#Sutter00) §8, §16, [\[Sutter02\]](#Sutter02) §18-19
 
 ## <a name="Sd-consistent"></a>Define Copy, move, and destroy consistently
 
@@ -20872,7 +20921,7 @@ If you define a move constructor, you must also define a move assignment operato
 
         // BAD: failed to also define a copy assignment operator
 
-        X(x&&) { /* stuff */ }
+        X(x&&) noexcept { /* stuff */ }
 
         // BAD: failed to also define a move assignment operator
     };
@@ -20933,7 +20982,7 @@ Prefer compiler-generated (including `=default`) special members; only these can
 In rare cases, classes that have members of strange types (such as reference members) are an exception because they have peculiar copy semantics.
 In a class holding a reference, you likely need to write the copy constructor and the assignment operator, but the default destructor already does the right thing. (Note that using a reference member is almost always wrong.)
 
-**References**: [\[C++CS\]](#C++CS) Item 52; [\[Cline99\]](#Cline99) §30.01-14, [\[Koenig97\]](#Koenig97) §4, [\[Stroustrup00\]](#Stroustrup00) §5.5, §10.4, [\[SuttHysl04b\]](#SuttHysl04b)
+**References**: [\[C++CS\]](#CplusplusCS) Item 52; [\[Cline99\]](#Cline99) §30.01-14, [\[Koenig97\]](#Koenig97) §4, [\[Stroustrup00\]](#Stroustrup00) §5.5, §10.4, [\[SuttHysl04b\]](#SuttHysl04b)
 
 Resource management rule summary:
 
@@ -21361,6 +21410,8 @@ Alternatively, we will decide that no change is needed and delete the entry.
 
 # Bibliography
 
+* <a name="Abrahams01"></a>
+  \[Abrahams01]:  D. Abrahams. [Exception-Safety in Generic Components](http://www.boost.org/community/exception_safety.html).
 * <a name="Alexandrescu01"></a>
   \[Alexandrescu01]:  A. Alexandrescu. Modern C++ Design (Addison-Wesley, 2001).
 * <a name="Cplusplus03"></a>
